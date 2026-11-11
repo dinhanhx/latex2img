@@ -1,0 +1,79 @@
+[project]
+name = "latex2img"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "typer>=0.12",
+    "pillow>=10.0",
+    "regex>=2024.0",  # \p{L} and grapheme (\X) matching for auto-text and wrap
+    "fonttools>=4.50",  # cmap coverage check for font randomization
+    "playwright>=1.45",  # MathJax backend (only backend in v1)
+    "tomli>=2.0; python_version < '3.11'",
+]
+
+[project.scripts]
+latex2img = "latex2img.cli:app"
+
+[dependency-groups]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "ruff"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/latex2img"]
+
+# ---------------- pixi ----------------
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[tool.pixi.dependencies]  # conda-forge
+python = "3.10.*"
+# future Tectonic backend: tectonic, poppler
+
+[tool.pixi.pypi-dependencies]  # resolved by uv
+latex2img = { path = ".", editable = true }
+
+[tool.pixi.feature.vendor.dependencies]
+nodejs = ">=20"
+
+[tool.pixi.environments]
+default = { features = ["dev"], solve-group = "default" }  # dev = [dependency-groups].dev
+prod = { features = [], solve-group = "default" }
+vendor = { features = ["vendor"], no-default-feature = true }
+
+[tool.pixi.tasks]
+install-browser = "playwright install chromium"
+doctor = "latex2img doctor"
+lint = "ruff check . && ruff format --check ."
+fmt = "ruff format ."
+test = "pytest"
+# offline bundle: conda+PyPI deps via pixi-pack, latex2img itself as a wheel (pixi-pack only packs wheels).
+# target: pixi-unpack dist/latex2img-env.tar && uv pip install --offline --no-deps --python env/bin/python dist/*.whl
+pack = "mkdir -p dist && pixi exec pixi-pack -e prod -p linux-64 --ignore-pypi-non-wheel -o dist/latex2img-env.tar pyproject.toml && pixi exec uv build --wheel -o dist"
+
+[tool.pixi.feature.vendor.tasks]
+vendor-mathjax = "rm -rf build/npm src/latex2img/assets/mathjax src/latex2img/assets/@mathjax && npm install --no-save --prefix build/npm mathjax@4.1.3 @mathjax/mathjax-newcm-font@4.1.3 @mathjax/mathjax-stix2-font@4.1.3 @mathjax/mathjax-pagella-font@4.1.3 @mathjax/mathjax-mhchem-font-extension@4.1.3 && cp -r build/npm/node_modules/mathjax build/npm/node_modules/@mathjax src/latex2img/assets/ && cd src/latex2img/assets/@mathjax && rm -rf */cjs */mjs */chtml */chtml.js */tex-*.js"  # browser loads only svg.js + svg/
+
+[tool.ruff]
+line-length = 120
+extend-exclude = [".pixi", "build", "src/latex2img/assets"]
+# Flake8 - E, F
+# pycodestyle - W
+# flake8-builtins - A
+# Pylint - PLC, PLE, PLW
+# isort - I
+select = ['E', 'F', 'W', 'A', 'PLC', 'PLE', 'PLW', 'I']
+
+[tool.ruff.format]
+# Like Black
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

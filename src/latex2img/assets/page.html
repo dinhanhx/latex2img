@@ -1,0 +1,58 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+html, body { margin: 0; padding: 0; background: transparent; }
+#host { display: inline-block; padding: 8px; color: #000; }
+mjx-container[display="true"] { margin: 0 !important; }
+</style>
+<script>
+  // window.L2I = {font, extensions, macros} is injected via add_init_script before load.
+  const cfg = window.L2I || {font: "mathjax-newcm", extensions: [], macros: {}};
+  window.MathJax = {
+    loader: {
+      // fonts: font extensions (e.g. mhchem's) resolve here instead of the CDN default
+      paths: {mathjax: "./mathjax", fonts: "./@mathjax", [cfg.font]: "./@mathjax/" + cfg.font + "-font"},
+      failed: (err) => { window.L2I_ERROR = String(err.message || err); },
+      load: ["input/tex", "output/svg", "[" + cfg.font + "]/svg"].concat(cfg.extensions.map((e) => "[tex]/" + e)),
+    },
+    // noundefined removed so unknown macros raise an error instead of rendering red text
+    tex: {packages: {"[+]": cfg.extensions, "[-]": ["noundefined"]}, macros: cfg.macros},
+    output: {
+      font: cfg.font,
+      fontPath: "./@mathjax/" + cfg.font + "-font",
+      mtextInheritFont: true,
+      fontCache: "local",
+      // wrapping is done by the preprocessor; keep MathJax from breaking lines itself
+      linebreaks: {inline: false, width: "100000em"},
+    },
+    startup: {typeset: false, pageReady: () => { window.L2I_READY = true; }},
+  };
+
+  const loadedFonts = {};
+  window.l2iSetFont = async (family, url) => {
+    if (loadedFonts[family]) return;
+    const face = new FontFace(family, "url(" + url + ")");
+    await face.load();
+    document.fonts.add(face);
+    loadedFonts[family] = true;
+  };
+
+  window.l2iRender = async ({tex, display, family, color}) => {
+    MathJax.texReset();
+    const node = await MathJax.tex2svgPromise(tex, {display, family});
+    const err = node.querySelector('[data-mml-node="merror"]');
+    if (err) return {error: err.getAttribute("title") || err.textContent};
+    const host = document.getElementById("host");
+    host.style.color = color;
+    host.replaceChildren(node);
+    const svg = node.querySelector("svg").cloneNode(true);
+    svg.setAttribute("color", color);  // MathJax paints with currentColor
+    return {svg: svg.outerHTML};
+  };
+</script>
+<script src="mathjax/startup.js"></script>
+</head>
+<body><div id="host"></div></body>
+</html>
