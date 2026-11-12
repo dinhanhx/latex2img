@@ -1,6 +1,6 @@
 # latex2img
 
-Render LaTeX math to PNG (or SVG for debugging) from the command line. It handles Vietnamese and other Unicode text inside equations, wraps long `\text{…}` names onto stacked lines, and can generate randomized variants (fonts, scale, colors, layout) as synthetic training data for image→LaTeX models.
+Render LaTeX math to PNG (or SVG for debugging) from the command line. It handles Vietnamese and other Unicode text inside equations, wraps long `\text{…}` names onto stacked lines, and can generate randomized variants (fonts, scale, colors, layout) as synthetic training data for image→LaTeX models. It can also generate random formulas to feed that pipeline (`amok`).
 
 Rendering uses MathJax 4.1.3 in headless Chromium. MathJax and the default text font ship inside the package, so rendering works fully offline once Chromium is installed.
 
@@ -117,7 +117,23 @@ latex2img batch eqs.txt -o out/ --variants 5 --seed 42 \
 
 A batch writes `out/images/<id>.png` (or `<id>_<k>.png` with variants) and `out/manifest.jsonl`. Each manifest row has one image's label (the LaTeX actually rendered), its size, the sampled parameters and any error. Failed equations stay in the manifest with `error` set. Re-running a batch skips images that already exist (`--overwrite` to redo them). While it runs, a batch shows a progress bar on stderr (only in a terminal, so pipes and CI logs stay clean).
 
-See `latex2img render --help` and `latex2img batch --help` for every option, grouped by topic (Output, Text & fonts, Style, Wrapping, Randomization, Labels & manifest, Run & debug).
+### Random formulas (`amok`)
+
+`amok` prints random LaTeX formulas, one per line, in the `.txt` format `batch` reads. It does not render anything itself.
+
+```bash
+# grammar: letters, Greek, numbers, \text{} words, \frac, \sqrt, ^, _, \left(\right), \sin, \sum, \int
+latex2img amok 1000 --seed 7 --lang vi --depth 3 -o rand.txt
+
+# mutate an existing corpus: same structure, new letters, digits, operators and \text{} words
+latex2img amok 1000 --from examples/input.txt --lang zh -o rand.txt
+
+latex2img batch rand.txt -o out/ --variants 2 --lang zh
+```
+
+`--lang` picks the `\text{}` word list (`en`, `vi`, `zh`; anything else falls back to `en`). The same `--seed` gives the same lines. `examples/amok.sh [COUNT_PER_LANG] [batch args...]` generates en, vi and zh formulas into `examples/amok.txt` and renders them to `examples/amok_out/`.
+
+See `latex2img render --help`, `latex2img batch --help` and `latex2img amok --help` for every option, grouped by topic (Output, Text & fonts, Style, Wrapping, Randomization, Labels & manifest, Run & debug).
 
 ### Manual line breaks
 
@@ -153,7 +169,7 @@ The bundled math fonts are newcm (default), stix2 and pagella.
 | --- | --- |
 | 0 | Everything rendered |
 | 1 | At least one equation failed (bad LaTeX, unknown macro) |
-| 2 | Usage error (bad flag, `-f pdf`, duplicate JSONL ids) |
+| 2 | Usage error (bad flag, `-f pdf`, duplicate JSONL ids, `amok` count < 1) |
 | 3 | Backend unavailable (no Chromium, missing assets) |
 | 4 | Timeout (single render) |
 

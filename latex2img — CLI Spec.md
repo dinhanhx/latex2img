@@ -13,6 +13,7 @@ Labels used below: **\[Unverified\]** = not checked against current docs/release
 **Goals**
 
 - Single equation (arg/stdin) and batch (txt one-per-line / JSONL) rendering, with per-sample font/scale/color randomization for synthetic training data.
+- Random formula generation (`amok`) to produce batch input without a hand-written corpus.
 - Correct rendering of Vietnamese diacritics in `\text{}` and bare Unicode in math, with a per-language font map for other scripts.
 - Auto-wrap long `\text{...}` names (e.g. `\text{price of agricultural land}`) onto multiple stacked lines; optional wrap of whole equations at top-level relations/operators.
 - Deterministic output (pinned fonts, pinned renderer assets), runnable fully offline.
@@ -53,7 +54,7 @@ Alternative worth noting: MathJax can run in Node directly (`mathjax-full` with 
 
 ## CLI interface
 
-Two subcommands (`render`, `batch`) plus `doctor` for backend checks. Built with `typer`.
+Three subcommands (`render`, `batch`, `amok`) plus `doctor` for backend checks. Built with `typer`.
 
 ```bash
 # single equation -> file
@@ -68,6 +69,10 @@ latex2img batch eqs.jsonl -o out/ --workers 4 --wrap-text 16
 # synthetic training data: 5 randomized variants per equation, reproducible
 latex2img batch eqs.txt -o out/ --variants 5 --seed 42 \
   --font-pool fonts/ --scale-range 1.0,3.0 --color-mode random
+
+# random formulas (text only, one per line) -> render them with batch
+latex2img amok 1000 --seed 7 --lang vi -o rand.txt
+latex2img batch rand.txt -o out/ --variants 2
 
 # check that Chromium and the vendored MathJax assets are available
 latex2img doctor
@@ -119,7 +124,7 @@ Batch flags for training data (details in the Randomization section):
 | `--skip-existing/--overwrite` | skip-existing | Resume interrupted runs. Skipped images are not re-rendered, but their manifest rows are rebuilt (preprocessing and sampling are deterministic) |
 | `--manifest PATH` | `out/manifest.jsonl` | Manifest location; `-` streams JSONL to stdout. Written to `PATH.tmp` and renamed on completion |
 
-Stdout is reserved for machine output: `render` prints the output path; `batch` prints nothing unless `--manifest -` streams manifest JSONL to stdout. `batch` draws a progress bar (rich) on stderr, only when stderr is a terminal; log lines print above it.
+Stdout is reserved for machine output: `render` prints the output path; `amok` prints formulas unless `-o` is given; `batch` prints nothing unless `--manifest -` streams manifest JSONL to stdout. `batch` draws a progress bar (rich) on stderr, only when stderr is a terminal; log lines print above it.
 
 `--help` groups options into panels (Typer `rich_help_panel`): Output, Text & fonts, Style, Wrapping, Randomization, Labels & manifest, Run & debug.
 
@@ -223,6 +228,25 @@ With `--variants > 1`, images are `out/images/{id}_{k:02d}.png`; each variant is
 
 Adds `fonttools` to core dependencies.
 
+## Random formulas (`amok`)
+
+`amok COUNT` writes COUNT random formulas, one per line, to stdout or `-o FILE`. Output is plain `.txt` for `batch`; `amok` never renders. Line k uses its own RNG `sample_rng(seed, "amok", k)`, so output is reproducible and independent of COUNT.
+
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `-o, --output` | stdout | Output `.txt` file |
+| `--seed` | `0` | Base seed |
+| `--lang` | `en` | `\text{}` word list: `en`, `vi`, `zh` (others fall back to `en`) |
+| `--depth` | `3` | Max nesting depth (grammar mode) |
+| `--from FILE` | off | Mutate a `.txt`/`.jsonl` corpus instead of using the grammar; line k mutates item `k mod N` |
+
+- **Grammar (default)**: `lhs REL expr`. `lhs` is an atom or `\text{words}`; `REL` ∈ `= \leq \geq \approx < >`. `expr` picks (weighted) an atom, a binary op (`+ - \times \cdot`), `\frac`, `\sqrt`, `^{}`, `_{}`, `\left(\right)`, `\sin/\cos/\log/\ln/\exp`, `\sum_{i=1}^{n}` or `\int_{0}^{T} … \, dt`, until `--depth` runs out. Atoms: a letter, a Greek letter, a number (integer, decimal or percent) or `\text{}` with 1–2 words.
+- **Mutation (`--from`)**: tokenizes each formula; ASCII letters are remapped consistently within one formula, digits and binary ops are randomized, and each `\text{}` argument is replaced with random words. Control words, braces and the arguments of `\begin`, `\end`, `\operatorname`, `\mathrm` are kept, so structure and brace balance are preserved.
+- Usage errors (exit 2): COUNT < 1, `--depth` < 0, unreadable or empty `--from` file.
+- `examples/amok.sh` generates en/vi/zh formulas (one seed per language) and renders them with `batch`.
+
+\[Verified\] Tests render 50 generated and mutated formulas through MathJax without errors, and a 20-formula `amok` → `batch` run gave ok=20 failed=0. Grammar output is structurally valid but not semantically realistic \[Inference\]; use `--from` when realism matters.
+
 ## Architecture
 
 Pipeline per job (straight run, backend-agnostic except step 4):
@@ -241,7 +265,8 @@ latex2img/
 ├── src/latex2img/
 │   ├── __init__.py
 │   ├── __main__.py          # python -m latex2img
-│   ├── cli.py               # typer app: render, batch, doctor
+│   ├── cli.py               # typer app: render, batch, amok, doctor
+│   ├── amok.py              # random formula grammar + corpus mutation
 │   ├── config.py            # dataclasses + TOML loading, precedence CLI > env > file > defaults
 │   ├── models.py            # RenderJob (+ math_font), RenderResult (+ timed_out), OutputFormat
 │   ├── io.py                # input readers (arg/stdin/txt/jsonl), manifest writer
@@ -566,6 +591,7 @@ Plain `pip install .` into a Python ≥ 3.10 venv, `uv pip install .`, and `uv t
 - **Padding**: trim-then-pad sizes, fixed `--padding`, `--padding-range` border equals `params.padding`, negative values exit 2.
 - **Renderer contract**: written against the `Renderer` protocol, not MathJax internals, so a future Tectonic renderer reuses it. Error cases (`\frac{`, unknown macro) must yield `RenderResult.error`, not exceptions.
 - **CLI**: `typer.testing.CliRunner` for exit codes and manifest content.
+- **amok**: same seed → same lines, balanced braces, non-empty `\text{}`, mutation keeps control words, and a MathJax smoke render of generated formulas.
 
 ### Offline / airgapped deployment
 
@@ -633,5 +659,6 @@ Deviations from the original plan, and why:
 - **CJK fonts not vendored**; extracted from the system `.ttc` into a cache.
 - **Batch progress bar** on stderr (rich, already a typer dependency), via an `on_done` callback on `run_samples`; disabled when stderr is not a TTY.
 - **pixi-pack needs the wheel workaround** described under Offline deployment.
+- **`amok` subcommand added** (not in the original plan): random formula generator, text only; see "Random formulas (`amok`)".
 
 Not implemented / not verified: `--dpi` (accepted, ignored); browser-crash restart (implemented, untested); offline install on a truly separate machine; `playwright install-deps` on a fresh OS.
