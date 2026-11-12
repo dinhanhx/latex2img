@@ -1,4 +1,4 @@
-"""typer app: render, batch, doctor."""
+"""typer app: render, batch, amok, doctor."""
 
 from __future__ import annotations
 
@@ -14,9 +14,11 @@ from rich.console import Console
 from rich.progress import MofNCompleteColumn, Progress
 from typing_extensions import Annotated
 
+from latex2img import amok as amoklib
 from latex2img.config import Settings, load_settings
 from latex2img.io import InputItem, ManifestWriter, read_inputs, read_single
 from latex2img.pipeline import Sample, SampleBuilder, run_samples
+from latex2img.randomize import sample_rng
 from latex2img.renderers.base import BackendUnavailable, get_renderer
 from latex2img.renderers.mathjax import check_assets
 
@@ -322,6 +324,40 @@ def batch(
     logging.getLogger(__name__).info("ok=%d failed=%d skipped=%d", stats.ok, stats.failed, stats.skipped)
     if stats.failed:
         raise typer.Exit(EXIT_FAILED)
+
+
+@app.command()
+def amok(
+    count: Annotated[int, typer.Argument(help="Number of formulas")],
+    output: Annotated[Optional[Path], typer.Option("-o", "--output", help="Output .txt [stdout]")] = None,
+    seed: Annotated[int, typer.Option("--seed", help="Base seed")] = 0,
+    lang: Annotated[str, typer.Option("--lang", help=r"\text{} word list: en, vi, zh")] = "en",
+    depth: Annotated[int, typer.Option("--depth", help="Max nesting depth (grammar)")] = 3,
+    source: Annotated[
+        Optional[Path], typer.Option("--from", exists=True, dir_okay=False, help="Mutate this .txt/.jsonl corpus")
+    ] = None,
+) -> None:
+    """Print random LaTeX formulas, one per line (feed the file to `batch`)."""
+    if count < 1 or depth < 0:
+        _usage("count must be >= 1 and depth >= 0")
+    items = []
+    if source:
+        try:
+            items = read_inputs(source)
+        except (ValueError, OSError) as e:
+            _usage(str(e))
+        if not items:
+            _usage(f"{source}: no formulas")
+    lines = []
+    for k in range(count):
+        rng = sample_rng(seed, "amok", k)
+        eq = amoklib.mutate(rng, items[k % len(items)].latex, lang) if items else amoklib.generate(rng, lang, depth)
+        lines.append(" ".join(eq.split()))  # one formula per line
+    text = "\n".join(lines) + "\n"
+    if output:
+        output.write_text(text, encoding="utf-8")
+    else:
+        typer.echo(text, nl=False)
 
 
 @app.command()
