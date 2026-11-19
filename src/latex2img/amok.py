@@ -59,12 +59,13 @@ def expr(rng: random.Random, d: int, lang: str) -> str:
         lambda: rf"\sqrt{{{sub()}}}",
         lambda: f"{atom(rng, lang)}^{{{sub()}}}",
         lambda: f"{atom(rng, lang)}_{{{sub()}}}",
+        lambda: f"{atom(rng, lang)}_{{{sub()}}}^{{{sub()}}}",
         lambda: rf"\left({sub()}\right)",
         lambda: rf"{rng.choice(FUNCS)}\left({sub()}\right)",
         lambda: rf"\sum_{{i=1}}^{{n}} {sub()}",
         lambda: rf"\int_{{0}}^{{T}} {sub()} \, dt",
     ]
-    return rng.choices(rules, weights=[4, 3, 1, 2, 1, 1, 1, 1, 1])[0]()
+    return rng.choices(rules, weights=[4, 3, 1, 2, 1, 1, 1, 1, 1, 1])[0]()
 
 
 def generate(rng: random.Random, lang: str = "en", depth: int = 3) -> str:

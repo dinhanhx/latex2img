@@ -240,7 +240,7 @@ Adds `fonttools` to core dependencies.
 | `--depth` | `3` | Max nesting depth (grammar mode) |
 | `--from FILE` | off | Mutate a `.txt`/`.jsonl` corpus instead of using the grammar; line k mutates item `k mod N` |
 
-- **Grammar (default)**: `lhs REL expr`. `lhs` is an atom or `\text{words}`; `REL` ∈ `= \leq \geq \approx < >`. `expr` picks (weighted) an atom, a binary op (`+ - \times \cdot`), `\frac`, `\sqrt`, `^{}`, `_{}`, `\left(\right)`, `\sin/\cos/\log/\ln/\exp`, `\sum_{i=1}^{n}` or `\int_{0}^{T} … \, dt`, until `--depth` runs out. Atoms: a letter, a Greek letter, a number (integer, decimal or percent) or `\text{}` with 1–2 words.
+- **Grammar (default)**: `lhs REL expr`. `lhs` is an atom or `\text{words}`; `REL` ∈ `= \leq \geq \approx < >`. `expr` picks (weighted) an atom, a binary op (`+ - \times \cdot`), `\frac`, `\sqrt`, `^{}`, `_{}`, `_{}^{}`, `\left(\right)`, `\sin/\cos/\log/\ln/\exp`, `\sum_{i=1}^{n}` or `\int_{0}^{T} … \, dt`, until `--depth` runs out. Atoms: a letter, a Greek letter, a number (integer, decimal or percent) or `\text{}` with 1–2 words.
 - **Mutation (`--from`)**: tokenizes each formula; ASCII letters are remapped consistently within one formula, digits and binary ops are randomized, and each `\text{}` argument is replaced with random words. Control words, braces and the arguments of `\begin`, `\end`, `\operatorname`, `\mathrm` are kept, so structure and brace balance are preserved.
 - Usage errors (exit 2): COUNT < 1, `--depth` < 0, unreadable or empty `--from` file.
 - `examples/amok.sh` generates en/vi/zh formulas (one seed per language) and renders them with `batch`.
