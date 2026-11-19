@@ -11,10 +11,11 @@ for lang in en vi zh; do  # own seed per lang, else all langs share the same for
 done > amok.txt
 # --lang zh: Noto Serif CJK covers English, Vietnamese and Chinese (needs fonts-noto-cjk).
 latex2img batch amok.txt -o amok_out --lang zh \
-  --variants 2 --seed 2410 \
-  --scale-range 1.5,3 \
+  --variants 5 --seed 2410 \
+  --scale-range 1.2,3 \
   --padding-range 2,16 \
   --wrap-text-range 15,30 \
   --color-mode random --min-contrast 4.5 \
   --continue-on-error \
+  --workers 4 \
   "$@"

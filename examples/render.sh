@@ -5,9 +5,10 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 latex2img batch input.txt -o out --lang zh \
-  --variants 2 --seed 2410 \
-  --scale-range 1.5,3 \
+  --variants 5 --seed 2410 \
+  --scale-range 1.2,3 \
   --padding-range 2,16 \
   --wrap-text-range 15,30 \
   --color-mode random --min-contrast 4.5 \
+  --workers 4 \
   "$@"
